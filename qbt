@@ -1,0 +1,25 @@
+#version: '3.8' # Specify the Docker Compose version
+services:
+  qbittorrentvpn:
+    image: dyonr/qbittorrentvpn
+    container_name: qbittorrentvpn
+    privileged: true
+    volumes:
+      - /home/jk/_dockervolumes/qbt/config:/config
+      - /mnt/dm5/:/downloads
+    environment:
+      - VPN_ENABLED=yes
+      - VPN_TYPE=wireguard
+      - LAN_NETWORK=192.168.0.0/24
+      - NAME_SERVERS=192.168.0.3
+      - ADDITIONAL_PORTS=8081
+      - WEBUI_PORT_ENV=8081
+      - UMASK=666
+      - PUID=1000
+      - GUID=1003
+      - INSTALL_PYTHON3=yes
+    ports:
+      - "8081:8080"
+      - "8999:8999"
+      - "8999:8999/udp"
+    restart: unless-stopped
