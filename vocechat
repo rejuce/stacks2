@@ -1,0 +1,12 @@
+services:
+  vocechat-server:
+    image: privoce/vocechat-server:latest
+    container_name: vocechat-server
+    restart: always
+    ports:
+      - "2189:3000"
+    volumes:
+      - /home/jk/_dockervolumes/vocechat/data:/home/vocechat-server/data
+    command:
+      - --network.frontend_url
+      - "https://chat.kwilleng.de"
