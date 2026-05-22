@@ -1,0 +1,15 @@
+version: "2.3"
+services:
+  threadfin:
+    image: fyb3roptik/threadfin
+    container_name: threadfin
+    ports:
+      - 34402:34400
+    environment:
+      - PUID=1000
+      - PGID=1001
+      - TZ=Europe/Berlin
+    volumes:
+      - /home/jk/_dockervolumes/threadfin/conf:/home/threadfin/conf
+      - /home/jk/_dockervolumes/threadfin/temp:/tmp/threadfin:rw
+    restart: unless-stopped
