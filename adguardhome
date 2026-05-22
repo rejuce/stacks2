@@ -1,0 +1,10 @@
+version: "3.8"
+services:
+  adguardhome:
+    image: adguard/adguardhome:latest
+    container_name: adguardhome
+    restart: unless-stopped
+    network_mode: "host"  # optional; host mode often easiest for DNS
+    volumes:
+      - /home/jk/_dockervolumes/adguardhome/conf:/opt/adguardhome/conf
+      - /home/jk/_dockervolumes/adguardhome/work:/opt/adguardhome/work
