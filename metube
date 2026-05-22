@@ -1,0 +1,16 @@
+services:
+  metube:
+    image: ghcr.io/alexta69/metube
+    environment:
+      - DOWNLOAD_MODE=limited
+      - MAX_CONCURRENT_DOWNLOADS=5
+      - YTDL_OPTIONS={"cookiefile":"/cookies.txt"}
+    container_name: metube
+    restart: unless-stopped
+    ports:
+      - "2998:8081"
+    volumes:
+      - /mnt/dm5/_temp/metube:/downloads
+      - /mnt/dm5/_temp/metube/cookies.txt:/cookies.txt
+      - /home/jk/.mozilla/firefox:/firefox:ro
+      - /home/jk/.pki:/root/.pki:ro
