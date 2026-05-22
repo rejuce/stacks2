@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    cpu_shares: 128
+    ports:
+      - "11434:11434"
+    volumes:
+      - /home/jk/_dockervolumes/ollama:/root/.ollama
+    restart: unless-stopped
+        # Optional but recommended CPU limits
+    deploy:
+      resources:
+        limits:
+          memory: 10g
+    networks:
+     - llm-net
+
+
+networks:
+  llm-net:
+    external: true
