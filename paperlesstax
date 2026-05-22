@@ -1,0 +1,176 @@
+# docker-compose file for running paperless from the docker container registry.
+# This file contains everything paperless needs to run.
+# Paperless supports amd64, arm and arm64 hardware.
+#
+# All compose files of paperless configure paperless in the following way:
+#
+# - Paperless is (re)started on system boot, if it was running before shutdown.
+# - Docker volumes for storing data are managed by Docker.
+# - Folders for importing and exporting files are created in the same directory
+#   as this file and mounted to the correct folders inside the container.
+# - Paperless listens on port 8000.
+#
+# In addition to that, this docker-compose file adds the following optional
+# configurations:
+#
+# - Instead of SQLite (default), PostgreSQL is used as the database server.
+# - Apache Tika and Gotenberg servers are started with paperless and paperless
+#   is configured to useh these services. These provide support for consuming
+#   Office documents (Word, Excel, Power Point and their LibreOffice counter-
+#   parts.
+#
+# To install and update paperless with this file, do the following:
+#
+# - Copy this file as 'docker-compose.yml' and the files 'docker-compose.env'
+#   and '.env' into a folder.
+# - Run 'docker-compose pull'.
+# - Run 'docker-compose run --rm webserver createsuperuser' to create a user.
+# - Run 'docker-compose up -d'.
+#
+# For more extensive installation and update instructions, refer to the
+# documentation.
+
+version: "3.4"
+services:
+  broker:
+    image: docker.io/library/redis:7
+    restart: unless-stopped
+    volumes:
+      - /home/jk/_dockervolumes/paperless-tax/redisdata:/data
+
+  db:
+    image: docker.io/library/postgres:15
+    restart: unless-stopped
+    volumes:
+      - /home/jk/_dockervolumes/paperless-tax/pgdata:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: paperless
+      POSTGRES_USER: paperless
+      POSTGRES_PASSWORD: paperless
+
+  webserver:
+    image: paperlessngx/paperless-ngx:latest
+    restart: unless-stopped
+    depends_on:
+      - db
+      - broker
+      - gotenberg
+      - tika
+    ports:
+      - "8001:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "-S", "--max-time", "2", "http://localhost:8000"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    volumes:
+      - /home/jk/_dockervolumes/paperless-tax/data:/usr/src/paperless/data
+      - /home/jk/_dockervolumes/paperless-tax/media:/usr/src/paperless/media
+
+      - /mnt/dm5/_temp/ngx-export/paperless-tax:/usr/src/paperless/export
+      - /mnt/dm5/_temp/paperless-tax-consume:/usr/src/paperless/consume
+#    env_file: docker-compose.env
+    environment:
+      PAPERLESS_REDIS: redis://broker:6379
+      PAPERLESS_DBHOST: db
+      PAPERLESS_TIKA_ENABLED: 1
+      PAPERLESS_TIKA_GOTENBERG_ENDPOINT: http://gotenberg:3000
+      PAPERLESS_TIKA_ENDPOINT: http://tika:9998
+      PAPERLESS_TIME_ZONE: Europe/Berlin
+      USERMAP_UID: 1000
+      USERMAP_GID: 1001
+      PAPERLESS_ADMIN_USER: jk
+      PAPERLESS_ADMIN_PASSWORD: a
+      COMPOSE_PROJECT_NAME: paperless
+      PAPERLESS_OCR_LANGUAGES: deu eng jpn
+      PAPERLESS_CONSUMER_RECURSIVE: 1
+
+  paperless-gpt:
+    # Use one of these image sources:
+    image: icereed/paperless-gpt:latest # Docker Hub
+    # image: ghcr.io/icereed/paperless-gpt:latest  # GitHub Container Registry
+    environment:
+      PAPERLESS_BASE_URL: "http://paperlesstax.hserver"
+      PAPERLESS_API_TOKEN: "706bbd2a1a399e53e1f0bf5c251b6f41794de08f"
+      PAPERLESS_PUBLIC_URL: "http://paperlesstax.hserver" # Optional
+      MANUAL_TAG: "paperless-gpt" # Optional, default: paperless-gpt
+      AUTO_TAG: "xAi" # Optional, default: paperless-gpt-auto
+      AUTO_GENERATE_TITLE : "false"
+      AUTO_GENERATE_CREATED_DATE : "false"
+      AUTO_GENERATE_TAGS : "false"
+      CORRESPONDENT_BLACK_LIST : "Jurgen,Jürgen, Juergen, Emi, Mioka, Luuk"
+      # LLM Configuration - Choose one:
+
+      # Option 3: Ollama (Local)
+      LLM_PROVIDER: "ollama"
+      LLM_MODEL: "qwen2.5:7b-instruct-q4_K_M"
+      OLLAMA_HOST: "http://ollama:11434"
+      OLLAMA_CONTEXT_LENGTH: "4096" # Sets Ollama NumCtx (context window)
+      TOKEN_LIMIT: 2000 # Recommended for smaller models
+
+      # Optional LLM Settings
+      # LLM_LANGUAGE: "English" # Optional, default: English
+
+      # OCR Configuration - Choose one:
+      # Option 1: LLM-based OCR
+      OCR_PROVIDER: "llm" # Default OCR provider
+      VISION_LLM_PROVIDER: "ollama" # openai or ollama
+      VISION_LLM_MODEL: "minicpm-v" # minicpm-v (ollama) or gpt-4o (openai)
+      #OLLAMA_HOST: "http://ollama:11434" # If using Ollama
+
+      # OCR Processing Mode
+      OCR_PROCESS_MODE: "image" # Optional, default: image, other options: pdf, whole_pdf
+      PDF_SKIP_EXISTING_OCR: "true" # Optional, skip OCR for PDFs with existing OCR
+
+     
+      # Enhanced OCR Features
+      CREATE_LOCAL_HOCR: "false" # Optional, save hOCR files locally
+      LOCAL_HOCR_PATH: "/app/hocr" # Optional, path for hOCR files
+      CREATE_LOCAL_PDF: "false" # Optional, save enhanced PDFs locally
+      LOCAL_PDF_PATH: "/app/pdf" # Optional, path for PDF files
+      PDF_UPLOAD: "false" # Optional, upload enhanced PDFs to paperless-ngx
+      PDF_REPLACE: "false" # Optional and DANGEROUS, delete original after upload
+      PDF_COPY_METADATA: "true" # Optional, copy metadata from original document
+      PDF_OCR_TAGGING: "true" # Optional, add tag to processed documents
+      PDF_OCR_COMPLETE_TAG: "paperless-gpt-ocr-complete" # Optional, tag name
+
+      AUTO_OCR_TAG: "paperless-gpt-ocr-auto" # Optional, default: paperless-gpt-ocr-auto
+      OCR_LIMIT_PAGES: "5" # Optional, default: 5. Set to 0 for no limit.
+      LOG_LEVEL: "info" # Optional: debug, warn, error
+    volumes:
+      - /home/jk/_dockervolumes/paperless-tax/gpt/prompts:/app/prompts # Mount the prompts directory
+      # For Google Document AI:
+      #- ${HOME}/.config/gcloud/application_default_credentials.json:/app/credentials.json
+      # For local hOCR and PDF saving:
+      #- ./hocr:/app/hocr # Only if CREATE_LOCAL_HOCR is true
+      #- ./pdf:/app/pdf # Only if CREATE_LOCAL_PDF is true
+    ports:
+      - "2995:8080"
+    depends_on:
+      - webserver
+    restart: unless-stopped
+    networks:
+      - llm-net
+      
+
+  gotenberg:
+    image: docker.io/gotenberg/gotenberg:7.8
+    restart: unless-stopped
+
+    # The gotenberg chromium route is used to convert .eml files. We do not
+    # want to allow external content like tracking pixels or even javascript.
+    command:
+      - "gotenberg"
+      - "--chromium-disable-javascript=true"
+      - "--chromium-allow-list=file:///tmp/.*"
+
+  tika:
+    image: apache/tika:latest
+    restart: unless-stopped
+
+
+
+networks:
+
+  llm-net:
+    external: true
